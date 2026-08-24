@@ -225,8 +225,12 @@ const emptySheets = drawings.filter(d => d[7] === 0).map(d => d[0]);
 console.log(`  drawings ${drawings.length} sheets` +
             (emptySheets.length ? `, ${emptySheets.length} holding no records (${emptySheets.join(', ')})` : ''));
 
-/* ---------- drop columns that are empty everywhere, to keep the payload small ---------- */
-const keep = allCols.filter((c,i) => rows.some(r => r[i] != null && r[i] !== ''));
+/* ---------- drop columns that are empty everywhere, to keep the payload small ----------
+   Progress columns are exempt. They start empty by design, and you have to be able to
+   filter on "not installed" - which is impossible if the column has been dropped. */
+const ALWAYS_KEEP = new Set(["installed", "install_date", "installed_by", "test_document_no", "test_status", "test_date", "complete", "completion_date", "progress_notes"]);
+const keep = allCols.filter((c,i) =>
+  ALWAYS_KEEP.has(c) || rows.some(r => r[i] != null && r[i] !== ''));
 const keepIx = keep.map(c => allCols.indexOf(c));
 const trimmed = rows.map(r => keepIx.map(i => r[i]));
 console.log(`  columns  ${keep.length} kept of ${allCols.length} (${allCols.length - keep.length} empty in every record)`);
