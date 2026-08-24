@@ -1,0 +1,62 @@
+name: Check the workbook builds
+
+# Runs the same conversion Cloudflare runs, so a workbook problem surfaces here
+# rather than as a failed deploy. Does not commit anything.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build data.json from the workbook
+        run: npm run build
+
+      - name: Sanity-check the output
+        run: |
+          node -e '
+            const fs = require("fs");
+            const d = JSON.parse(fs.readFileSync("public/data.json", "utf8"));
+            const problems = [];
+
+            if (!d.rows || d.rows.length < 1)      problems.push("no records");
+            if (!d.cols || d.cols.length < 10)     problems.push("suspiciously few columns");
+            if (!d.cols.includes("record_key"))    problems.push("record_key column missing");
+            if (!d.cols.includes("chainage_start_m")) problems.push("chainage_start_m column missing");
+
+            const ki = d.cols.indexOf("record_key");
+            const keys = d.rows.map(r => r[ki]).filter(Boolean);
+            if (keys.length !== d.rows.length)     problems.push("some records have no Record Key");
+            if (new Set(keys).size !== keys.length) problems.push("duplicate Record Keys");
+
+            const ci = d.cols.indexOf("chainage_start_m");
+            const bad = d.rows.filter(r => r[ci] != null && typeof r[ci] !== "number").length;
+            if (bad) problems.push(bad + " records have a non-numeric chainage");
+
+            if (problems.length) {
+              console.error("\n  FAILED:\n   - " + problems.join("\n   - ") + "\n");
+              process.exit(1);
+            }
+            console.log("  ok: " + d.rows.length + " records, " + d.cols.length +
+                        " columns, " + d.drawings.length + " sheets, " +
+                        d.dq.length + " exceptions, " +
+                        Object.keys(d.flags).length + " records flagged");
+          '
+
+      - name: Upload the built data for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-json
+          path: public/data.json
+          retention-days: 7
