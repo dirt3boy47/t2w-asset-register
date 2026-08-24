@@ -9,7 +9,7 @@
   --navy:#12263f; --navy2:#1d3a5f; --ink:#1a2027; --mid:#5b6875; --line:#d8dee6;
   --bg:#f4f6f9; --card:#fff; --accent:#0b6ea8; --accent-w:#e7f2f9;
   --warn:#b8860b; --warn-bg:#fdf6e3; --danger:#a3282d;
-  --r1:#0b6ea8; --r2:#2f8f5b; --r3:#8a5cb8; --r4:#c2731a; --r5:#1a8f9c; --r6:#a3282d;
+  --r1:#0b6ea8; --r2:#2f8f5b; --r3:#8a5cb8; --r4:#c2731a; --r5:#1a8f9c; --r6:#a3282d; --r7:#4a7c1f;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -531,11 +531,13 @@ function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('on');
 /* register colours, used by tags and the strip */
 var REGCOL = {
   'Trench Type':'var(--r1)', 'Trench Stop & Bulkhead':'var(--r2)', 'Foreign Service':'var(--r3)',
-  'Thrust Block':'var(--r4)', 'Creek Crossing':'var(--r5)', 'Road & Rail Crossing':'var(--r6)'
+  'Thrust Block':'var(--r4)', 'Creek Crossing':'var(--r5)', 'Road & Rail Crossing':'var(--r6)',
+  'Vegetation':'var(--r7)'
 };
 var REGHEX = {
   'Trench Type':'#0b6ea8', 'Trench Stop & Bulkhead':'#2f8f5b', 'Foreign Service':'#8a5cb8',
-  'Thrust Block':'#c2731a', 'Creek Crossing':'#1a8f9c', 'Road & Rail Crossing':'#a3282d'
+  'Thrust Block':'#c2731a', 'Creek Crossing':'#1a8f9c', 'Road & Rail Crossing':'#a3282d',
+  'Vegetation':'#4a7c1f'
 };
 
 /* ---------- load a dataset ---------- */
@@ -608,8 +610,12 @@ function apply(){
   var from=$('#chFrom').value, to=$('#chTo').value;
   from = from===''?null:Number(from);
   to   = to===''  ?null:Number(to);
-  if(from!=null && to!=null && from>to){ var t=from; from=to; to=t;
-    $('#chFrom').value=from; $('#chTo').value=to; }
+  /* Swap internally only if the range is backwards, and NEVER write back to the
+     inputs here. apply() runs on every keystroke: with From=5000 already entered,
+     the first digit typed into To makes the range 5000-6 momentarily, and rewriting
+     the fields at that moment scrambles what the user is typing. Normalising is
+     done on blur instead - see normaliseRange(). */
+  if(from!=null && to!=null && from>to){ var t=from; from=to; to=t; }
 
   var dm   = dwgMatcher($('#dwgIn').value);
   var aid  = $('#aidIn').value.trim().toUpperCase();
@@ -944,6 +950,8 @@ var GROUPS=[
                   'info_source','included_in_current_plan']],
   ['Construction',['proposed_crossing_method','type_6_m','type_7_m','type_4_and_7_m','type_4_and_6_m']],
   ['Ownership',  ['operator','location','utility_id']],
+  ['Vegetation',  ['area_m2','timber_density']],
+  ['Thrust block', ['thrust_block_category']],
   ['Construction progress', ['installed','install_date','installed_by','test_document_no',
                              'test_status','test_date','complete','completion_date',
                              'progress_notes']],
@@ -967,6 +975,8 @@ var LABEL={
   type_4_and_7_m:'Type 4 & 7', type_4_and_6_m:'Type 4 & 6',
   operator:'Owner / authority', location:'Location', utility_id:'Utility ID',
   comments:'Comments', source_file:'Source file', source_row:'Source row',
+  area_m2:'Area (m2)', timber_density:'Timber density',
+  thrust_block_category:'Thrust block category',
   installed:'Installed', install_date:'Install date', installed_by:'Installed by',
   test_document_no:'Test document no', test_status:'Test status', test_date:'Test date',
   complete:'Complete', completion_date:'Completion date', progress_notes:'Progress notes'
@@ -1391,6 +1401,17 @@ function clearFilters(){
    '#chipNotInstalled','#chipNoTestDoc','#chipComplete','#chipNotComplete'].forEach(function(sel){
     var e=$(sel); if(e) e.classList.remove('on'); });
 }
+/* Called on blur/change, not on input. Safe to touch the fields here because the
+   user has finished typing in them. */
+function normaliseRange(){
+  var a=$('#chFrom'), b=$('#chTo');
+  if(a.value==='' || b.value==='') return;
+  var x=Number(a.value), y=Number(b.value);
+  if(!isFinite(x) || !isFinite(y) || x<=y) return;
+  a.value=y; b.value=x;
+  toast('Chainage range was back to front — swapped to '+fmt(y,1)+' to '+fmt(x,1)+' m');
+  apply();
+}
 function setMode(overlap){
   MODE.overlap=overlap;
   $('#chipContain').classList.toggle('on',!overlap);
@@ -1405,6 +1426,12 @@ function init(){
   var deb;
   function onInput(){ clearTimeout(deb); deb=setTimeout(apply,140); }
   ['#chFrom','#chTo','#dwgIn','#aidIn','#txtIn'].forEach(function(s){ $(s).addEventListener('input',onInput); });
+  ['#chFrom','#chTo'].forEach(function(s){
+    $(s).addEventListener('blur',normaliseRange);
+    $(s).addEventListener('change',normaliseRange);
+    /* Enter should commit the range rather than leave it half-applied */
+    $(s).addEventListener('keydown',function(e){ if(e.key==='Enter'){ normaliseRange(); apply(); } });
+  });
   ['#secIn','#regIn','#typeIn'].forEach(function(s){ $(s).addEventListener('change',apply); });
   ['#chipFlag','#chipNoOwner','#chipDerived','#chipRanged',
    '#chipNotInstalled','#chipNoTestDoc','#chipComplete','#chipNotComplete'].forEach(function(sel){
