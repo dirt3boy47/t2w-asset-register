@@ -1,0 +1,16 @@
+{
+  "name": "t2w-asset-register",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Searchable asset register for the Toowoomba to Warwick pipeline. data.json is generated from the master workbook at build time.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-data.mjs"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
